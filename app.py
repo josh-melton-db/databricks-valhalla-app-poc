@@ -19,9 +19,14 @@ class Point(BaseModel):
     lon: float = Field(ge=-180, le=180)
 
 
-class MatrixRequest(BaseModel):
+class AugmentMatrixRequest(BaseModel):
     new_point: Point
     existing_points: list[Point] = Field(min_length=1, max_length=500)
+    costing: str = "auto"
+
+
+class MatrixRequest(BaseModel):
+    points: list[Point] = Field(min_length=2, max_length=500)
     costing: str = "auto"
 
 
@@ -67,8 +72,19 @@ def health() -> dict:
 
 
 @app.post("/augment-matrix")
-def augment_matrix(request: MatrixRequest) -> dict:
+def augment_matrix(request: AugmentMatrixRequest) -> dict:
     # Road travel is asymmetric, so an inserted matrix row and column are both returned.
     outbound = _matrix([request.new_point], request.existing_points, request.costing)
     inbound = _matrix(request.existing_points, [request.new_point], request.costing)
     return {"from_new": outbound["sources_to_targets"][0], "to_new": [row[0] for row in inbound["sources_to_targets"]]}
+
+
+@app.post("/matrix")
+def matrix(request: MatrixRequest) -> dict:
+    """Return a complete directed road matrix for the supplied point order."""
+    result = _matrix(request.points, request.points, request.costing)
+    return {
+        "units": "kilometers",
+        "costing": request.costing,
+        "sources_to_targets": result["sources_to_targets"],
+    }

@@ -1,7 +1,7 @@
 # Valhalla Databricks App proof of concept
 
 This FastAPI service runs a precompiled `valhalla_service` subprocess on localhost and
-exposes `POST /augment-matrix`. A one-time Databricks job places an Andorra tile extract
+exposes `POST /matrix` and `POST /augment-matrix`. A one-time Databricks job places an Andorra tile extract
 and a relocatable Valhalla runtime in a Unity Catalog Volume resource.
 At startup the App service principal downloads the archive through the Files API and
 extracts it under ephemeral `/tmp`; Databricks Apps do not FUSE-mount UC Volumes.
@@ -14,6 +14,16 @@ Example body:
 
 The response contains both the new row (`from_new`) and new column (`to_new`) because
 road travel times need not be symmetric.
+
+For a complete solver matrix, send points in node-index order:
+
+```json
+{"points":[{"lat":42.5063,"lon":1.5218},{"lat":42.5078,"lon":1.5211}],"costing":"auto"}
+```
+
+`POST /matrix` returns Valhalla's directed `sources_to_targets` cells in the same row
+and column order. Each cell includes `time` in seconds and `distance` in kilometers;
+unreachable cells include Valhalla's error status. The endpoint accepts 2–500 points.
 
 `build_valhalla.py` compiles Valhalla 3.5.1 and builds the Andorra tiles on DBR 15.4
 LTS. `package_runtime.py` adds the full shared-library closure and regenerates the
