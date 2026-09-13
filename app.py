@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import time
 from contextlib import asynccontextmanager
@@ -10,7 +11,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 VALHALLA_URL = "http://127.0.0.1:8002"
-CONFIG = os.environ.get("VALHALLA_CONFIG", "/tmp/valhalla/tiles/valhalla.json")
+REGION = os.environ.get("VALHALLA_REGION", "michigan")
+CONFIG = os.environ.get("VALHALLA_CONFIG", f"/tmp/valhalla/regions/{REGION}/tiles/valhalla.json")
 _process: subprocess.Popen[str] | None = None
 
 
@@ -59,7 +61,11 @@ async def lifespan(_: FastAPI):
         raise RuntimeError("Valhalla did not become ready")
     yield
     _process.terminate()
-    _process.wait(timeout=10)
+    try:
+        _process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _process.kill()
+        _process.wait(timeout=2)
 
 
 app = FastAPI(title="Valhalla Matrix POC", lifespan=lifespan)
@@ -68,7 +74,9 @@ app = FastAPI(title="Valhalla Matrix POC", lifespan=lifespan)
 @app.get("/health")
 def health() -> dict:
     response = httpx.get(f"{VALHALLA_URL}/status", timeout=2)
-    return {"status": "ok", "valhalla": response.json()}
+    metadata_path = "/tmp/valhalla/active-region.json"
+    metadata = json.loads(open(metadata_path, encoding="utf-8").read())
+    return {"status": "ok", "region": metadata, "valhalla": response.json()}
 
 
 @app.post("/augment-matrix")

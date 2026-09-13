@@ -4,3 +4,5 @@ command:
 env:
   - name: VALHALLA_VOLUME_PATH
     valueFrom: valhalla-assets
+  - name: VALHALLA_REGION
+    value: michigan
